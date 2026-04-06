@@ -18,6 +18,8 @@ export interface Product {
   location?: string;
   entryDate?: any;
   updatedAt?: any;
+  status: 'available' | 'ordered';
+  useQR: boolean;
 }
 
 export interface Requester {

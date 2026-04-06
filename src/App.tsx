@@ -54,9 +54,14 @@ import {
   ClipboardList,
   ShoppingCart,
   BookOpen,
-  CheckCircle2
+  CheckCircle2,
+  QrCode,
+  Maximize,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format, differenceInMinutes, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
@@ -207,6 +212,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { name: 'Asistencia', path: '/attendance', icon: Clock },
     { name: 'Solicitudes', path: '/requests', icon: ClipboardList },
     { name: 'Bitácora', path: '/reports', icon: BookOpen },
+    { name: 'Escáner QR', path: '/scanner', icon: Maximize },
   ];
 
   return (
@@ -345,8 +351,9 @@ const Dashboard = () => {
   const stats = useMemo(() => {
     const totalProducts = products.length;
     const totalStock = products.reduce((acc, p) => acc + p.quantity, 0);
+    const orderedProducts = products.filter(p => p.status === 'ordered').length;
     const recentMovements = movements.slice(0, 5);
-    return { totalProducts, totalStock, recentMovements };
+    return { totalProducts, totalStock, orderedProducts, recentMovements };
   }, [products, movements]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
@@ -358,9 +365,10 @@ const Dashboard = () => {
         <p className="text-gray-500">Estado actual de la bodega</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Productos" value={stats.totalProducts} icon={Package} color="blue" />
         <StatCard title="Artículos Totales" value={stats.totalStock} icon={Building2} color="green" />
+        <StatCard title="Productos Pedidos" value={stats.orderedProducts} icon={ShoppingCart} color="yellow" isWarning={stats.orderedProducts > 0} />
         <StatCard title="Movimientos Hoy" value={movements.filter(m => {
           const d = m.date?.toDate ? m.date.toDate() : new Date(m.date);
           return d.toDateString() === new Date().toDateString();
@@ -407,6 +415,7 @@ const StatCard = ({ title, value, icon: Icon, color, isWarning }: any) => {
     red: 'bg-red-50 text-red-600',
     green: 'bg-green-50 text-green-600',
     purple: 'bg-purple-50 text-purple-600',
+    yellow: 'bg-yellow-50 text-yellow-600',
   };
   return (
     <div className={cn(
@@ -437,8 +446,10 @@ const Inventory = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [qrProduct, setQrProduct] = useState<Product | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [requesters, setRequesters] = useState<Requester[]>([]);
 
@@ -527,6 +538,8 @@ const Inventory = () => {
       category: formData.get('category') as string,
       quantity: Number(formData.get('quantity')),
       unit: formData.get('unit') as string,
+      status: formData.get('status') as 'available' | 'ordered',
+      useQR: formData.get('useQR') === 'on',
       imageUrl: imagePreview || editingProduct?.imageUrl || '',
       updatedAt: serverTimestamp(),
     };
@@ -631,6 +644,8 @@ const Inventory = () => {
             category,
             quantity,
             unit,
+            status: 'available',
+            useQR: false,
             entryDate: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -900,6 +915,7 @@ const Inventory = () => {
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Producto</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Stock Actual</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acciones</th>
               </tr>
             </thead>
@@ -943,8 +959,26 @@ const Inventory = () => {
                       <span className="text-xs text-gray-400 uppercase">{p.unit}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-medium",
+                      p.status === 'available' ? "bg-green-100 text-green-600" : "bg-yellow-100 text-yellow-600"
+                    )}>
+                      {p.status === 'available' ? 'Disponible' : 'Pedido'}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {p.useQR && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-purple-600 hover:bg-purple-50"
+                          onClick={() => { setQrProduct(p); setIsQrModalOpen(true); }}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -1016,6 +1050,22 @@ const Inventory = () => {
               <option value="sacos">Sacos / Bultos</option>
             </Select>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="Estado" name="status" defaultValue={editingProduct?.status || 'available'}>
+              <option value="available">Disponible</option>
+              <option value="ordered">Pedido</option>
+            </Select>
+            <div className="flex items-center gap-2 pt-8">
+              <input 
+                type="checkbox" 
+                id="useQR" 
+                name="useQR" 
+                defaultChecked={editingProduct?.useQR || false}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="useQR" className="text-sm font-medium text-gray-700">Activar QR</label>
+            </div>
+          </div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
             <Button type="submit" className="flex-1">Guardar</Button>
@@ -1061,6 +1111,43 @@ const Inventory = () => {
             <Button type="submit" className="flex-1">Registrar</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* QR Modal */}
+      <Modal
+        isOpen={isQrModalOpen}
+        onClose={() => { setIsQrModalOpen(false); setQrProduct(null); }}
+        title={`Código QR: ${qrProduct?.name}`}
+      >
+        {qrProduct && (
+          <div className="flex flex-col items-center space-y-6 py-4">
+            <div className="p-4 bg-white rounded-2xl shadow-inner border border-gray-100">
+              <QRCodeCanvas 
+                id="qr-canvas"
+                value={JSON.stringify({ id: qrProduct.id, action: 'mark_as_ordered' })} 
+                size={256}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-4">Escanea este código para marcar el producto como pedido.</p>
+              <Button onClick={() => {
+                const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+                if (canvas) {
+                  const url = canvas.toDataURL('image/png');
+                  const link = document.createElement('a');
+                  link.download = `QR_${qrProduct.name}.png`;
+                  link.href = url;
+                  link.click();
+                }
+              }} className="gap-2">
+                <Download className="h-5 w-5" />
+                Descargar QR
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -2363,6 +2450,135 @@ const DailyReportsPage = () => {
   );
 };
 
+const ScannerPage = () => {
+  const [scanResult, setScanResult] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(true);
+  const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+
+    if (isScanning) {
+      scanner = new Html5QrcodeScanner(
+        "reader",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        /* verbose= */ false
+      );
+
+      scanner.render(onScanSuccess, onScanFailure);
+    }
+
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      }
+    };
+  }, [isScanning]);
+
+  async function onScanSuccess(decodedText: string) {
+    try {
+      const data = JSON.parse(decodedText);
+      if (data.id && data.action === 'mark_as_ordered') {
+        setScanResult(data.id);
+        setIsScanning(false);
+        setStatus('scanning');
+        setMessage('Procesando producto...');
+
+        // Update product status in Firestore
+        await updateDoc(doc(db, 'products', data.id), {
+          status: 'ordered',
+          updatedAt: serverTimestamp()
+        });
+
+        setStatus('success');
+        setMessage('¡Producto marcado como pedido exitosamente!');
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          navigate('/inventory');
+        }, 2000);
+      } else {
+        throw new Error('QR no válido para esta aplicación');
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+      setMessage('Error: El código QR no es válido o el producto no existe.');
+      setTimeout(() => {
+        setStatus('idle');
+        setIsScanning(true);
+      }, 3000);
+    }
+  }
+
+  function onScanFailure(error: any) {
+    // console.warn(`Code scan error = ${error}`);
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900">Escáner de Productos</h1>
+        <p className="text-gray-500">Escanea el código QR para marcar un producto como pedido</p>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <div className="p-8">
+          {status === 'idle' || status === 'error' ? (
+            <div id="reader" className="overflow-hidden rounded-2xl border-2 border-dashed border-gray-200"></div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              {status === 'scanning' && <Loader2 className="h-16 w-16 animate-spin text-blue-600" />}
+              {status === 'success' && (
+                <div className="bg-green-100 p-4 rounded-full">
+                  <CheckCircle2 className="h-16 w-16 text-green-600" />
+                </div>
+              )}
+              <p className={cn(
+                "text-lg font-semibold",
+                status === 'success' ? "text-green-600" : "text-gray-900"
+              )}>
+                {message}
+              </p>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              <p className="text-sm font-medium">{message}</p>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-gray-50 px-8 py-4 flex justify-between items-center border-t border-gray-100">
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <QrCode className="h-4 w-4" />
+            <span>Apunta la cámara al código QR</span>
+          </div>
+          <Button variant="ghost" onClick={() => navigate('/inventory')}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+        <h3 className="text-blue-800 font-bold flex items-center gap-2 mb-2">
+          <Maximize className="h-5 w-5" />
+          ¿Cómo funciona?
+        </h3>
+        <ul className="text-sm text-blue-700 space-y-2 list-disc list-inside">
+          <li>Asegúrate de que el producto tenga el QR activado en el inventario.</li>
+          <li>Apunta la cámara de tu dispositivo hacia el código impreso o en pantalla.</li>
+          <li>El sistema identificará el producto y cambiará su estado a "Pedido" automáticamente.</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -2376,6 +2592,7 @@ export default function App() {
         <Route path="/attendance" element={<Layout><AttendancePage /></Layout>} />
         <Route path="/requests" element={<Layout><RequestsPage /></Layout>} />
         <Route path="/reports" element={<Layout><DailyReportsPage /></Layout>} />
+        <Route path="/scanner" element={<Layout><ScannerPage /></Layout>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

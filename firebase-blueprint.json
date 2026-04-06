@@ -24,9 +24,11 @@
         "unit": { "type": "string", "description": "e.g., kg, m2, units" },
         "location": { "type": "string", "description": "Warehouse location" },
         "entryDate": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["available", "ordered"] },
+        "useQR": { "type": "boolean" }
       },
-      "required": ["name", "category", "quantity", "unit"]
+      "required": ["name", "category", "quantity", "unit", "status", "useQR"]
     },
     "Movement": {
       "title": "Movement",

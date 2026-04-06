@@ -35,11 +35,13 @@ service cloud.firestore {
     // ===============================================================
     
     function isValidProduct(data) {
-      return data.keys().hasAll(['name', 'category', 'quantity', 'unit']) &&
+      return data.keys().hasAll(['name', 'category', 'quantity', 'unit', 'status', 'useQR']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.category is string &&
              data.quantity is number &&
-             data.unit is string;
+             data.unit is string &&
+             data.status in ['available', 'ordered'] &&
+             data.useQR is bool;
     }
 
     function isValidMovement(data) {

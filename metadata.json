@@ -1,5 +1,5 @@
 {
   "name": "Bodega de Materiales de Construcción",
   "description": "Aplicación completa para gestionar el inventario de una bodega de materiales de construcción con control de stock, roles de usuario y registro de movimientos.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera"]
 }
