@@ -1,0 +1,89 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: products
+// Document ID: {productId}
+// Fields:
+//   - name: string (required) - Product name
+//   - category: string (required) - Category
+//   - quantity: number (required) - Current stock
+//   - unit: string (required) - Unit of measure
+//   - location: string (optional) - Warehouse location
+//   - entryDate: timestamp (optional) - Initial entry date
+//   - updatedAt: timestamp (optional) - Last update date
+//
+// Collection: movements
+// Document ID: {movementId}
+// Fields:
+//   - productId: string (required) - Product ID
+//   - productName: string (required) - Product name
+//   - type: string (required) - 'entry' or 'exit'
+//   - quantity: number (required) - Amount moved
+//   - date: timestamp (required) - Movement date
+//   - userName: string (optional) - User name
+//   - notes: string (optional) - Additional info
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'category', 'quantity', 'unit']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.category is string &&
+             data.quantity is number &&
+             data.unit is string;
+    }
+
+    function isValidMovement(data) {
+      return data.keys().hasAll(['productId', 'type', 'quantity', 'date', 'givenBy', 'receivedBy']) &&
+             data.productId is string &&
+             data.type in ['entry', 'exit'] &&
+             data.quantity is number && data.quantity > 0 &&
+             data.givenBy is string &&
+             data.receivedBy is string;
+    }
+
+    // ===============================================================
+    // Rules (Public Access as requested by removing login)
+    // ===============================================================
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isValidProduct(request.resource.data);
+      allow update: if isValidProduct(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /requesters/{requesterId} {
+      allow read, write: if true;
+    }
+
+    match /attendance/{attendanceId} {
+      allow read, write: if true;
+    }
+
+    match /movements/{movementId} {
+      allow read, write: if true;
+    }
+    
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    match /dailyReports/{reportId} {
+      allow read, write: if true;
+    }
+  }
+}

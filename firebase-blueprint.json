@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and basic info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "worker"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Construction material product in inventory.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "description": "e.g., kg, m2, units" },
+        "location": { "type": "string", "description": "Warehouse location" },
+        "entryDate": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "quantity", "unit"]
+    },
+    "Movement": {
+      "title": "Movement",
+      "description": "History of stock entries and exits.",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "type": { "type": "string", "enum": ["entry", "exit"] },
+        "quantity": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["productId", "type", "quantity", "date", "userId"]
+    },
+    "Requester": {
+      "title": "Requester",
+      "description": "Authorized personnel for material withdrawal.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily worker attendance and hours tracking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "date": { "type": "string", "description": "YYYY-MM-DD" },
+        "arrival": { "type": "string", "format": "date-time" },
+        "breakStart": { "type": "string", "format": "date-time" },
+        "breakEnd": { "type": "string", "format": "date-time" },
+        "departure": { "type": "string", "format": "date-time" },
+        "totalHours": { "type": "number" },
+        "status": { "type": "string", "enum": ["not_started", "working", "on_break", "finished"] }
+      },
+      "required": ["userId", "date", "status"]
+    },
+    "ProductRequest": {
+      "title": "ProductRequest",
+      "description": "User requests for new products or stock.",
+      "type": "object",
+      "properties": {
+        "productName": { "type": "string" },
+        "category": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "comment": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_process", "purchased", "rejected"] },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productName", "category", "quantity", "unit", "priority", "status", "userId", "userName", "createdAt"]
+    },
+    "DailyReport": {
+      "title": "DailyReport",
+      "description": "Daily site log with advances, issues, and delays.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "advances": { "type": "string" },
+        "issues": { "type": "string" },
+        "delays": { "type": "string" },
+        "nextDayPlan": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date", "userId", "userName", "advances", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Inventory products"
+    },
+    "/movements/{movementId}": {
+      "schema": "Movement",
+      "description": "Stock movement history"
+    },
+    "/requesters/{requesterId}": {
+      "schema": "Requester",
+      "description": "Authorized personnel"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Worker attendance records"
+    },
+    "/requests/{requestId}": {
+      "schema": "ProductRequest",
+      "description": "User product requests"
+    },
+    "/dailyReports/{reportId}": {
+      "schema": "DailyReport",
+      "description": "Daily site log reports"
+    }
+  }
+}
